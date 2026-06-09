@@ -7,6 +7,16 @@ SOURCE_BRANCH=$2
 DESTINATION_REPO=$3
 DESTINATION_BRANCH=$4
 
+# Reject inputs that begin with '-' so they cannot be reinterpreted as git options
+for arg in "$SOURCE_REPO" "$SOURCE_BRANCH" "$DESTINATION_REPO" "$DESTINATION_BRANCH"; do
+  case "$arg" in
+    -*)
+      echo "Error: arguments must not begin with '-'" >&2
+      exit 1
+      ;;
+  esac
+done
+
 if ! echo $SOURCE_REPO | grep -Eq ':|@|\.git\/?$'; then
   if [[ -n "$SSH_PRIVATE_KEY" || -n "$SOURCE_SSH_PRIVATE_KEY" ]]; then
     SOURCE_REPO="git@github.com:${SOURCE_REPO}.git"
@@ -25,8 +35,12 @@ if ! echo $DESTINATION_REPO | grep -Eq ':|@|\.git\/?$'; then
   fi
 fi
 
-echo "SOURCE=$SOURCE_REPO:$SOURCE_BRANCH"
-echo "DESTINATION=$DESTINATION_REPO:$DESTINATION_BRANCH"
+# Redact any userinfo (e.g. https://user:token@host/...) before logging
+SAFE_SOURCE_REPO=$(printf '%s' "$SOURCE_REPO" | sed -E 's#(://)[^/@[:space:]]+@#\1***@#')
+SAFE_DESTINATION_REPO=$(printf '%s' "$DESTINATION_REPO" | sed -E 's#(://)[^/@[:space:]]+@#\1***@#')
+
+echo "SOURCE=$SAFE_SOURCE_REPO:$SOURCE_BRANCH"
+echo "DESTINATION=$SAFE_DESTINATION_REPO:$DESTINATION_BRANCH"
 
 if [[ -n "$SOURCE_SSH_PRIVATE_KEY" ]]; then
   # Clone using source ssh key if provided
